@@ -14,6 +14,7 @@ export function App() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const userId = session?.user.id ?? null;
 
   useEffect(() => {
     let active = true;
@@ -21,9 +22,12 @@ export function App() {
       if (active) setSession(data.session);
     });
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setAdmin(null);
-      setAccessDenied(false);
+      // Supabase re-emits the session on every tab focus and token refresh.
+      // Keep the same object unless the signed-in user changed, so the
+      // workspace (and a half-written note) is not torn down.
+      setSession((current) =>
+        current?.user.id === nextSession?.user.id ? current : nextSession
+      );
     });
     return () => {
       active = false;
@@ -32,21 +36,29 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) {
+    setAdmin(null);
+    setAccessDenied(false);
+    setSelectedId(null);
+    if (!userId) {
       setIsLoading(false);
       return;
     }
+    let active = true;
     setIsLoading(true);
     void apiFetch<{ user: AdminUser }>("/admin/me")
       .then(({ user }) => {
-        setAdmin(user);
-        setAccessDenied(false);
+        if (active) setAdmin(user);
       })
       .catch((error) => {
-        setAccessDenied(error instanceof ApiError && error.status === 403);
+        if (active) setAccessDenied(error instanceof ApiError && error.status === 403);
       })
-      .finally(() => setIsLoading(false));
-  }, [session]);
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   if (isLoading) return <main className="centered">Loading safety operations…</main>;
   if (!session) return <LoginPage />;
