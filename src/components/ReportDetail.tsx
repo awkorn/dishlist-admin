@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
-import type { ReportDetailResponse, UserRole } from "../types";
+import type { ReportDetailResponse, TargetType, UserRole } from "../types";
 import { StatusBadge } from "./StatusBadge";
 
 interface ReportDetailProps {
@@ -15,11 +15,19 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
   const [error, setError] = useState("");
   const [isWorking, setIsWorking] = useState(false);
 
+  // Each load takes a ticket; a response is applied only if no newer load
+  // (another report, or a reload) started while it was in flight. Otherwise a
+  // slow response could show one report's evidence above another's actions.
+  const latestLoad = useRef(0);
+
   const load = useCallback(async () => {
+    const ticket = ++latestLoad.current;
     setError("");
     try {
-      setData(await apiFetch<ReportDetailResponse>(`/admin/reports/${reportId}`));
+      const next = await apiFetch<ReportDetailResponse>(`/admin/reports/${reportId}`);
+      if (ticket === latestLoad.current) setData(next);
     } catch (loadError) {
+      if (ticket !== latestLoad.current) return;
       setError(loadError instanceof Error ? loadError.message : "Unable to load report");
     }
   }, [reportId]);
@@ -28,6 +36,9 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
     setData(null);
     setNote("");
     void load();
+    return () => {
+      latestLoad.current += 1;
+    };
   }, [load]);
 
   async function claim() {
@@ -49,7 +60,11 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
       setError("Enter a resolution note of at least three characters.");
       return;
     }
-    if (!window.confirm(`Confirm ${decision.toLowerCase().replace("_", " ")}?`)) return;
+    const prompt =
+      decision === "SUSPEND_USER" && data?.report.targetType !== "USER"
+        ? "Hide this content and suspend its author?"
+        : `Confirm ${decision.toLowerCase().replace("_", " ")}?`;
+    if (!window.confirm(prompt)) return;
     setIsWorking(true);
     setError("");
     try {
@@ -66,15 +81,18 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
     }
   }
 
-  async function restore() {
-    if (!data || note.trim().length < 3) {
+  async function restore(targetType: TargetType, targetId: string) {
+    if (note.trim().length < 3) {
       setError("Enter a restoration note of at least three characters.");
       return;
     }
-    if (!window.confirm("Restore this target to the product?")) return;
+    const prompt =
+      targetType === "USER" ? "Lift this user's suspension?" : "Restore this content to the product?";
+    if (!window.confirm(prompt)) return;
     setIsWorking(true);
+    setError("");
     try {
-      await apiFetch(`/admin/targets/${data.report.targetType}/${data.report.targetId}/restore`, {
+      await apiFetch(`/admin/targets/${targetType}/${targetId}/restore`, {
         method: "POST",
         body: JSON.stringify({ note }),
       });
@@ -90,10 +108,12 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
   if (error && !data) return <main className="detail"><p className="error" role="alert">{error}</p></main>;
   if (!data) return <main className="detail"><p>Loading report…</p></main>;
 
-  const { report, target } = data;
+  const { report, target, targetOwner } = data;
   const isOpen = report.status === "PENDING" || report.status === "REVIEWED";
+  const isContent = report.targetType !== "USER";
   const targetIsRemoved =
     target?.status === "SUSPENDED" || target?.moderationState === "HIDDEN";
+  const ownerIsSuspended = targetOwner?.status === "SUSPENDED";
 
   return (
     <main className="detail">
@@ -131,6 +151,17 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
         <pre>{JSON.stringify(target, null, 2)}</pre>
       </section>
 
+      {isContent && targetOwner && (
+        <section className="card metadata-grid">
+          <div>
+            <span>Author</span>
+            <strong>{targetOwner.username || targetOwner.firstName || "Unnamed user"}</strong>
+          </div>
+          <div><span>Author status</span><strong>{targetOwner.status}</strong></div>
+          <div><span>Author ID</span><strong className="mono">{targetOwner.uid}</strong></div>
+        </section>
+      )}
+
       {isOpen && (
         <section className="card action-panel">
           <h2>Resolution</h2>
@@ -153,20 +184,21 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
             <button className="secondary" disabled={isWorking} onClick={() => void resolve("DISMISS")}>
               Dismiss report
             </button>
-            {report.targetType === "USER" ? (
-              <button className="danger" disabled={isWorking} onClick={() => void resolve("SUSPEND_USER")}>
-                Suspend user
-              </button>
-            ) : (
+            {isContent && (
               <button className="danger" disabled={isWorking} onClick={() => void resolve("HIDE_CONTENT")}>
                 Hide content
+              </button>
+            )}
+            {(!isContent || (targetOwner && !ownerIsSuspended)) && (
+              <button className="danger" disabled={isWorking} onClick={() => void resolve("SUSPEND_USER")}>
+                {isContent ? "Hide content and suspend author" : "Suspend user"}
               </button>
             )}
           </div>
         </section>
       )}
 
-      {role === "ADMIN" && targetIsRemoved && (
+      {role === "ADMIN" && (targetIsRemoved || ownerIsSuspended) && (
         <section className="card action-panel">
           <h2>Administrator restoration</h2>
           <p>Restoration is audited and requires a reason.</p>
@@ -180,9 +212,26 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
               placeholder="Document why this target should be restored."
             />
           </label>
-          <button className="secondary" disabled={isWorking} onClick={() => void restore()}>
-            Restore target
-          </button>
+          <div className="actions">
+            {targetIsRemoved && (
+              <button
+                className="secondary"
+                disabled={isWorking}
+                onClick={() => void restore(report.targetType, report.targetId)}
+              >
+                {isContent ? "Restore content" : "Restore user"}
+              </button>
+            )}
+            {ownerIsSuspended && targetOwner && (
+              <button
+                className="secondary"
+                disabled={isWorking}
+                onClick={() => void restore("USER", targetOwner.uid)}
+              >
+                Restore author
+              </button>
+            )}
+          </div>
         </section>
       )}
 

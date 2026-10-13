@@ -64,6 +64,9 @@ export interface ReportDetailResponse {
     actions: ModerationAction[];
   };
   target: Record<string, unknown> | null;
+  targetOwner:
+    | (PersonSummary & { status: "ACTIVE" | "SUSPENDED"; suspendedAt: string | null })
+    | null;
   relatedReports: Array<{
     id: string;
     reason: ReportReason;
