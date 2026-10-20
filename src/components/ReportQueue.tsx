@@ -99,6 +99,7 @@ export function ReportQueue({
             <option value="INAPPROPRIATE">Inappropriate</option>
             <option value="HARASSMENT">Harassment</option>
             <option value="SPAM">Spam</option>
+            <option value="COPYRIGHT">Copyright</option>
             <option value="OTHER">Other</option>
           </select>
         </label>

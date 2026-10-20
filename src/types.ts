@@ -1,6 +1,11 @@
 export type UserRole = "MODERATOR" | "ADMIN";
 export type ReportStatus = "PENDING" | "REVIEWED" | "ACTIONED" | "DISMISSED";
-export type ReportReason = "INAPPROPRIATE" | "HARASSMENT" | "SPAM" | "OTHER";
+export type ReportReason =
+  | "INAPPROPRIATE"
+  | "HARASSMENT"
+  | "SPAM"
+  | "COPYRIGHT"
+  | "OTHER";
 export type TargetType = "USER" | "DISHLIST" | "RECIPE";
 
 export interface AdminUser {
