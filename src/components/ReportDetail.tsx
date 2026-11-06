@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
-import type { ReportDetailResponse, TargetType, UserRole } from "../types";
+import type { MemoryPhotoLink, ReportDetailResponse, TargetType, UserRole } from "../types";
 import { StatusBadge } from "./StatusBadge";
 
 interface ReportDetailProps {
@@ -114,6 +114,8 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
   const targetIsRemoved =
     target?.status === "SUSPENDED" || target?.moderationState === "HIDDEN";
   const ownerIsSuspended = targetOwner?.status === "SUSPENDED";
+  const { photoLinks, ...currentTarget } = target ?? {};
+  const memoryPhotos = Array.isArray(photoLinks) ? (photoLinks as MemoryPhotoLink[]) : [];
 
   return (
     <main className="detail">
@@ -146,9 +148,23 @@ export function ReportDetail({ reportId, role, onChanged }: ReportDetailProps) {
         <pre>{JSON.stringify(report.targetSnapshot || target, null, 2)}</pre>
       </section>
 
+      {report.targetType === "MEMORY" && memoryPhotos.length > 0 && (
+        <section className="card">
+          <h2>Memory photos</h2>
+          <p className="hint">Private photos. These links expire after an hour; reload to refresh them.</p>
+          <div className="photo-grid">
+            {memoryPhotos.map((photo) => (
+              <a key={photo.path} href={photo.url} target="_blank" rel="noreferrer">
+                <img src={photo.thumbUrl} alt="Reported memory photo" />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="card">
         <h2>Current target</h2>
-        <pre>{JSON.stringify(target, null, 2)}</pre>
+        <pre>{JSON.stringify(target ? currentTarget : null, null, 2)}</pre>
       </section>
 
       {isContent && targetOwner && (

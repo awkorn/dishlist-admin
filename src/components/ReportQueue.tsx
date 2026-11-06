@@ -90,6 +90,7 @@ export function ReportQueue({
             <option value="USER">User</option>
             <option value="DISHLIST">DishList</option>
             <option value="RECIPE">Recipe</option>
+            <option value="MEMORY">Memory</option>
           </select>
         </label>
         <label>

@@ -99,6 +99,28 @@ describe("ReportDetail", () => {
     });
   });
 
+  it("shows a reported memory's private photos", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      ...detail,
+      report: { ...detail.report, targetType: "MEMORY", targetId: "memory-1" },
+      target: {
+        id: "memory-1",
+        story: "Thanksgiving at our house.",
+        moderationState: "VISIBLE",
+        authorId: "user-2",
+        photoLinks: [
+          { path: "user-2/r1/a.jpg", url: "https://signed/a", thumbUrl: "https://signed/a-thumb" },
+        ],
+      },
+    });
+    render(<ReportDetail reportId="report-1" role="MODERATOR" onChanged={vi.fn()} />);
+
+    const photo = await screen.findByRole("img", { name: "Reported memory photo" });
+    expect(photo.getAttribute("src")).toBe("https://signed/a-thumb");
+    expect(screen.getByText("MEMORY report")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hide content" })).toBeTruthy();
+  });
+
   it("ignores a slow response for a report that is no longer selected", async () => {
     let finishFirst!: (value: ReportDetailResponse) => void;
     vi.mocked(apiFetch)

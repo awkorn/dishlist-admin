@@ -135,6 +135,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .metadata-grid span { color: #6b7280; font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .section-title { display: flex; justify-content: space-between; gap: 16px; }
 .legacy { color: #8a4b17; font-size: 12px; font-weight: 800; }
+.hint { color: #6b7280; font-size: 13px; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.photo-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
 pre {
   max-height: 420px;
   overflow: auto;
