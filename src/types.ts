@@ -6,7 +6,14 @@ export type ReportReason =
   | "SPAM"
   | "COPYRIGHT"
   | "OTHER";
-export type TargetType = "USER" | "DISHLIST" | "RECIPE";
+export type TargetType = "USER" | "DISHLIST" | "RECIPE" | "MEMORY";
+
+/** A memory photo with a short-lived signed link (memory photos are private). */
+export interface MemoryPhotoLink {
+  path: string;
+  url: string;
+  thumbUrl: string;
+}
 
 export interface AdminUser {
   uid: string;
